@@ -1,0 +1,288 @@
+"use client";
+import { useState, useRef, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { motion } from "framer-motion";
+
+interface Message {
+  id: number;
+  role: "user" | "ai";
+  content: string;
+  timestamp: string;
+}
+
+export default function ChatbotUI() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [userIP, setUserIP] = useState<string>("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Fetch public IP on load
+  useEffect(() => {
+    const fetchIP = async () => {
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        setUserIP(data.ip);
+      } catch (err) {
+        console.error("Failed to fetch IP address:", err);
+      }
+    };
+
+    fetchIP();
+  }, []);
+
+  const getCurrentTimestamp = () => {
+    return new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user",
+      content: input.trim(),
+      timestamp: getCurrentTimestamp(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+
+    try {
+      const response = await fetch("http://192.168.0.100:5000/user_msg_Api", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          ip: userIP,
+        }),
+      });
+
+      const data = await response.json();
+      const aiResponse = data.gemini_response || "AI did not respond.";
+
+      const aiMessage: Message = {
+        id: Date.now() + 1,
+        role: "ai",
+        content: aiResponse,
+        timestamp: getCurrentTimestamp(),
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("Error communicating with Flask API:", error);
+      const errorMsg: Message = {
+        id: Date.now() + 2,
+        role: "ai",
+        content: "There was an error contacting the Flask API.",
+        timestamp: getCurrentTimestamp(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-800 dark:bg-gray-900">
+      <div className="bg-blue-500 dark:bg-gray-800 rounded-md p-5 text-left mt-4">
+        <h1 className="text-2xl font-semibold text-blue-100 dark:text-white">
+          Smart ChatBot
+        </h1>
+        <p className="text-sm text-blue-200 mt-1">Your IP: {userIP}</p>
+      </div>
+      <Card className="flex-1 mt-2 bg-gray-100 overflow-hidden rounded-2xl shadow-md">
+        <CardContent className="p-4 h-full flex flex-col">
+          <ScrollArea className="flex-1 space-y-4 overflow-y-auto pr-2">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`w-full flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`p-3 rounded-xl max-w-xl w-fit relative ${
+                    msg.role === "user"
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 dark:bg-gray-800 text-blue-700 dark:text-white"
+                  }`}
+                >
+                  {/* ✅ Preserves line breaks and formatting */}
+                  <pre className="whitespace-pre-wrap font-mono">
+                    {msg.content}
+                  </pre>
+                  <div className="text-xs text-gray-300 dark:text-gray-500 mt-1 text-right">
+                    {msg.timestamp}
+                  </div>
+                </motion.div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </ScrollArea>
+          <div className="mt-4 flex gap-2">
+            <Input
+              placeholder="Type your message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 placeholder-red-300 bg-blue-400"
+            />
+            <Button onClick={handleSend}>Send</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+---------------------------------------------------------
+from flask import Flask, request
+from flask_restful import Api, Resource
+from flask_cors import CORS
+import pandas as pd
+import torch
+from sentence_transformers import SentenceTransformer, util
+import warnings
+import traceback
+import google.generativeai as genai
+
+genai.configure(api_key="AIzaSyC5LigDtYzTO9NGsQQ4S7Kr_GTYvNdbPbU")
+
+warnings.filterwarnings("ignore", message=".*Torch was not compiled with flash attention.*")
+
+app = Flask(__name__)
+CORS(app)
+api = Api(app)
+
+print("🔄 Starting up...")
+
+try:
+    # Device setup
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"✅ Using device: {device}")
+    if device == 'cuda':
+        print("🧠 GPU:", torch.cuda.get_device_name(0))
+
+    # Load CSV
+    print("📁 Loading Bhagavad Gita verses...")
+    df = pd.read_csv("processed_v1.0.csv")  # Use full path if necessary
+    verses = df['EngMeaning'].tolist()
+
+    # Load model
+    print("🔍 Loading SentenceTransformer model...")
+    model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+
+    # Generate verse embeddings
+    print("📦 Encoding verses into embeddings...")
+    verse_embeddings = model.encode(verses, convert_to_tensor=True, device=device)
+
+    print("✅ Initialization complete.")
+
+except Exception as e:
+    print("❌ Error during startup:")
+    traceback.print_exc()
+
+
+class user_msg_Api(Resource):
+    def post(self):
+        data = request.get_json()
+        user_msg = data.get("message", "").strip()
+
+        print("\n📥 Received message:")
+        print(user_msg)
+
+        if not user_msg:
+            print("⚠️ Empty message received.")
+            return {"error": "Empty input"}, 400
+
+        try:
+            # Step 1: Find most similar verse
+            print("🔍 Finding best matching verse...")
+            input_embedding = model.encode(user_msg, convert_to_tensor=True, device=device)
+            cosine_scores = util.cos_sim(input_embedding, verse_embeddings)[0]
+            top_idx = torch.argmax(cosine_scores).item()
+            top_score = cosine_scores[top_idx].item()
+            top_verse = df.iloc[top_idx]
+
+            # Step 2: Construct Gemini Prompt
+            proccesed_msg = f"""user msg: {user_msg}\n
+                            {top_verse['ID']} (Chapter {top_verse['Chapter']}, Verse {top_verse['Verse']})\n
+                            {top_verse['EngMeaning']}\n
+                            Similarity Score: {round(top_score, 4)}"""
+            prompt = f"""I need you to relate a message from me describing my problem, along with a Bhagavata Gita verse. you have to relate my problem with given verse, and describe the solution using the verse. At fist of your msg describe every problem's solution is in Bhagavat Gita. Don't say **Connecting the Verse to Your Problem:** and enstead of  **Solution from the Verse:** say Solution: . Avoid greeding in the msg like "hello", "hii".               
+                    {proccesed_msg}
+                    """
+
+            print("\n🧠 Prompt sent to Gemini:")
+            print(prompt)
+
+            # Step 3: Call Gemini API
+            try:
+                gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+                response = gemini_model.generate_content(prompt)
+                reply = response.text.strip()
+
+                # ✅ Print final combined Gemini-generated message
+                print("\n📤 Final Combined Message to Deliver:")
+                print("────────────────────────────────────────────")
+                print(reply)
+                print("────────────────────────────────────────────")
+
+            except Exception as gen_error:
+                print("❌ Gemini API Error:")
+                traceback.print_exc()
+                reply = "Could not generate response from Gemini."
+
+            # Step 4: Return all results
+            return {
+                "status": "success",
+                "matched_verse": {
+                    "chapter": int(top_verse["Chapter"]),
+                    "verse": int(top_verse["Verse"]),
+                    "eng_meaning": top_verse["EngMeaning"],
+                    "similarity": round(top_score, 4)
+                },
+                "gemini_response":
+                     f"{top_verse['ID']} (Chapter {top_verse['Chapter']}, Verse {top_verse['Verse']})\n"
+                     f"\n"
+                     f"{top_verse['EngMeaning']}\n"
+                     f"─────────────────────────────────\n"
+                     f"{reply}\n"
+                     f"─────────────────────────────────"
+                
+            }
+
+        except Exception as e:
+            print("❌ Error during processing:")
+            traceback.print_exc()
+            return {"error": "Internal processing error"}, 500
+
+
+# API route
+api.add_resource(user_msg_Api, "/user_msg_Api")
+
+# Run the server
+if __name__ == "__main__":
+    print("🚀 Running Flask server on port 5000...")
+    app.run(host="0.0.0.0", port=5000, debug=True)
