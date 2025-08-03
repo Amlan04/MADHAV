@@ -11,7 +11,7 @@
 ### Input JSON Format:
 ```json
 {
-  "message": "How can I stay calm in difficult situations?",
+  "message": "<User msg>",
   "history": [
     {
       "role": "user",
