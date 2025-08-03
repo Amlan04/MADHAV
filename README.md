@@ -1,6 +1,13 @@
+### Content:
+- ` back_end contains the api `
+- ` front_end contains the webpage(chatbot) for testing `
+- ` Ignore training `
 ### TO DO:
-- ` Install all required modules by using backend\api_p\requirements.txt `
-- ` Find CUDA version (If you have NVIDIA GPU, else ignore) `
+- ` Install all required modules by using back_end/api_p/requirements.txt `
+- ` Update 'GEMINI_API_KEY' in back_end/api_p/.env with your own api-key `
+- ` Find CUDA version according to that install the required version of touch (Only If you have NVIDIA GPU, else ignore) `
+### Note:
+- ` History must be handled in front-end `
 ### Input JSON Format:
 ```json
 {
