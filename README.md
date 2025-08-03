@@ -11,6 +11,7 @@
 - ` Find CUDA version according to that install the required version of touch (Only If you have NVIDIA GPU, else ignore) `
 ### Note:
 - ` History must be handled in front-end `
+- ` Suggest to use Python virtual environment `
 ### Input JSON Format:
 ```json
 {
@@ -38,7 +39,7 @@
     "eng_meaning": "<Gita Verse>",
     "similarity": 0.86
   },
-  "gemini_response": "<Gemini Respose>"
+  "gemini_response": "<Final Respose>"
 }
 ```
 #### Error Responses
