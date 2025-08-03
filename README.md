@@ -3,6 +3,7 @@
 ### Content:
 - ` back_end contains the api `
 - ` front_end contains the webpage(chatbot) for testing `
+- ` data contains all the files that I used to build this project `
 - ` Ignore training `
 ### TO DO:
 - ` Install all required modules by using back_end/api_p/requirements.txt `
