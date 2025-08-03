@@ -1,0 +1,8 @@
+flask==2.3.3
+flask-restful==0.3.10
+flask-cors==4.0.0
+pandas==2.2.1
+torch==2.2.2
+sentence-transformers==2.6.1
+google-generativeai==0.4.1
+python-dotenv==1.0.1
