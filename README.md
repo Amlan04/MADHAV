@@ -1,3 +1,6 @@
+### TO DO:
+- ` Install all required modules by using backend\api_p\requirements.txt `
+- ` Find CUDA version (If you have NVIDIA GPU, else ignore) `
 ### Input JSON Format:
 ```json
 {
