@@ -1,3 +1,5 @@
+### Flow Diagram
+![Alt Text](MADHAV_V1.0_Diagram.drawio.png) 
 ### Content:
 - ` back_end contains the api `
 - ` front_end contains the webpage(chatbot) for testing `
